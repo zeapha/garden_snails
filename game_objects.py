@@ -1,7 +1,10 @@
-# Create initial store items
-store_items.append(StoreItem("sprinkler", 50, 20, 100, duration=30))  # $1.00, lasts 30 seconds
-store_items.append(StoreItem("gnome", 150, 20, 200, duration=45))  # $2.00, lasts 45 seconds
-store_items.append(StoreItem("shoes", 250, 20, 300))  # $3.00, permanent effectclass StoreItem:
+import pygame
+import random
+import math
+import time
+from settings import *
+
+class StoreItem:
     def __init__(self, name, x, y, price, duration=None):
         self.name = name
         self.x = x
@@ -17,7 +20,7 @@ store_items.append(StoreItem("shoes", 250, 20, 300))  # $3.00, permanent effectc
         self.timer = 0
         self.effect_radius = 100  # For items that affect an area
         
-    def draw(self):
+    def draw(self, screen):
         # Draw different items based on name
         if self.name == "sprinkler":
             # Draw a blue sprinkler
@@ -59,11 +62,11 @@ store_items.append(StoreItem("shoes", 250, 20, 300))  # $3.00, permanent effectc
             # Draw a pair of tiny boots
             boot_y = self.y + 20
             # Left boot
-            pygame.draw.rect(screen, BROWN, (self.x + 10, boot_y, 15, 25))
-            pygame.draw.rect(screen, BROWN, (self.x + 10, boot_y + 15, 20, 10))
+            pygame.draw.rect(screen, DARK_BROWN, (self.x + 10, boot_y, 15, 25))
+            pygame.draw.rect(screen, DARK_BROWN, (self.x + 10, boot_y + 15, 20, 10))
             # Right boot
-            pygame.draw.rect(screen, BROWN, (self.x + 35, boot_y, 15, 25))
-            pygame.draw.rect(screen, BROWN, (self.x + 35, boot_y + 15, 20, 10))
+            pygame.draw.rect(screen, DARK_BROWN, (self.x + 35, boot_y, 15, 25))
+            pygame.draw.rect(screen, DARK_BROWN, (self.x + 35, boot_y + 15, 20, 10))
             
         # Draw price tag if in store
         if self.in_store:
@@ -90,38 +93,7 @@ store_items.append(StoreItem("shoes", 250, 20, 300))  # $3.00, permanent effectc
             if self.timer >= self.duration:
                 self.active = False
                 self.timer = 0
-                
-import pygame
-import random
-import sys
-import math
-import time
 
-# Initialize pygame
-pygame.init()
-
-# Set up the screen
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Garden Snails Game")
-
-# Colors
-WHITE = (255, 255, 255)
-GREEN = (100, 200, 100)
-LIME_GREEN = (50, 255, 50)  # Brighter green for lettuce
-BROWN = (139, 69, 19)
-BLUE = (100, 100, 255)
-BLACK = (0, 0, 0)
-LIGHT_GRAY = (220, 220, 220)
-
-# Game areas - tank is now 1/8th of screen in lower right
-GARDEN_RECT = pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
-TANK_RECT = pygame.Rect(SCREEN_WIDTH - SCREEN_WIDTH//4, SCREEN_HEIGHT - SCREEN_HEIGHT//4, 
-                        SCREEN_WIDTH//4, SCREEN_HEIGHT//4)
-STORE_RECT = pygame.Rect(0, 0, SCREEN_WIDTH, 100)  # Store at the top of the screen
-
-# Game classes
 class Snail:
     def __init__(self, x, y):
         self.x = x
@@ -147,7 +119,7 @@ class Snail:
         self.last_dx = 0
         self.last_dy = 0
         
-    def draw(self):
+    def draw(self, screen):
         # Draw the snail - simplified but still looking good
         
         # Draw the shell
@@ -189,9 +161,9 @@ class Snail:
         # Draw shoes if the snail has them
         if self.has_shoes:
             # Left boot
-            pygame.draw.rect(screen, (139, 69, 19), (self.x - body_length - 5, self.y + self.height, 10, 5))
+            pygame.draw.rect(screen, DARK_BROWN, (self.x - body_length - 5, self.y + self.height, 10, 5))
             # Right boot
-            pygame.draw.rect(screen, (139, 69, 19), (self.x - body_length + 5, self.y + self.height, 10, 5))
+            pygame.draw.rect(screen, DARK_BROWN, (self.x - body_length + 5, self.y + self.height, 10, 5))
         
     def find_closest_lettuce(self, lettuces):
         closest_lettuce = None
@@ -215,7 +187,7 @@ class Snail:
         
         return closest_lettuce
         
-    def update(self, lettuces):
+    def update(self, lettuces, store_items):
         self.rect = pygame.Rect(self.x, self.y, self.width, self.height)
         
         # Only move if not being dragged
@@ -223,9 +195,9 @@ class Snail:
             # Increment random movement timer
             self.random_move_timer += 0.1
             
-            # Decide whether to continue in last direction with high probability
+            # Decide whether to continue in last direction with VERY high probability (90%)
             if self.last_dx != 0 or self.last_dy != 0:
-                if random.random() < 0.8:  # 80% chance to continue in same direction
+                if random.random() < 0.9:  # 90% chance to continue in same direction (increased from 80%)
                     self.x += self.last_dx
                     self.y += self.last_dy
                     return  # Skip the rest of movement logic
@@ -301,22 +273,22 @@ class Snail:
                         if dist_to_item < item.effect_radius:
                             current_speed *= 0.5  # 50% speed in sprinkler area
                             
-                    # Gnome effect - snails avoid radius, make it much stronger
+                    # Gnome effect - snails avoid radius, MUCH stronger effect
                     elif item.name == "gnome":
                         dist_to_item = math.sqrt((self.x - item.x)**2 + (self.y - item.y)**2)
-                        if dist_to_item < item.effect_radius * 1.2:  # Slightly larger avoidance radius
-                            # Reverse direction away from gnome with strong force
+                        if dist_to_item < item.effect_radius * 1.5:  # Larger avoidance radius
+                            # Reverse direction away from gnome with stronger force
                             dx = self.x - item.x
                             dy = self.y - item.y
                             distance = max(1, math.sqrt(dx*dx + dy*dy))
-                            # Move at 3x normal speed away from gnome
-                            self.x += (dx / distance) * current_speed * 3.0
-                            self.y += (dy / distance) * current_speed * 3.0
+                            # Move at 5x normal speed away from gnome (increased from 3x)
+                            self.x += (dx / distance) * current_speed * 5.0
+                            self.y += (dy / distance) * current_speed * 5.0
                             
                             # Store the last movement for direction persistence
-                            self.last_dx = (dx / distance) * current_speed * 3.0
-                            self.last_dy = (dy / distance) * current_speed * 3.0
-                            continue  # Skip normal movement
+                            self.last_dx = (dx / distance) * current_speed * 5.0
+                            self.last_dy = (dy / distance) * current_speed * 5.0
+                            return  # Skip normal movement
             
             # Move toward target with jitter
             move_dx = ((dx / distance) * current_speed) + jitter_x
@@ -355,7 +327,7 @@ class Lettuce:
         self.spawn_time = time.time()  # Track when the lettuce was created
         self.points_given = False  # Track if we've given points for this lettuce
         
-    def draw(self):
+    def draw(self, screen):
         if self.bad:
             color = (150, 150, 0)  # Yellowish for bad lettuce
             edge_color = (130, 130, 0)
@@ -402,257 +374,24 @@ class Lettuce:
     def update(self):
         self.rect = pygame.Rect(self.x, self.y, self.width, self.height)
 
-# Game variables
-snails = []
-lettuces = []
-store_items = []
-mouse_x, mouse_y = 0, 0
-dragging_item = None
-spawn_timer = 0
-money = 500  # Starting money (raised to allow testing store items)
-
-# Game loop
-clock = pygame.time.Clock()
-running = True
-
-while running:
-    # Event handling
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-            
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            mouse_x, mouse_y = event.pos
-            
-            # Check if clicked on a store item
-            if STORE_RECT.collidepoint(mouse_x, mouse_y):
-                for item in store_items:
-                    if item.rect.collidepoint(mouse_x, mouse_y) and item.in_store:
-                        # Check if enough money
-                        if money >= item.price:
-                            item.dragging = True
-                            dragging_item = item
-                            break
-            else:
-                # Check if clicked on a snail
-                for snail in snails:
-                    if snail.rect.collidepoint(mouse_x, mouse_y):
-                        snail.dragging = True
-                        dragging_item = snail
-                        break
-                        
-                # If not dragging a snail, check if clicked on lettuce
-                if not dragging_item:
-                    for lettuce in lettuces:
-                        if lettuce.rect.collidepoint(mouse_x, mouse_y):
-                            lettuce.dragging = True
-                            dragging_item = lettuce
-                            break
-                            
-                # If not dragging food or snail, check if clicked on placed store item
-                if not dragging_item:
-                    for item in store_items:
-                        if not item.in_store and item.rect.collidepoint(mouse_x, mouse_y):
-                            item.dragging = True
-                            dragging_item = item
-                            break
-                
-        elif event.type == pygame.MOUSEBUTTONUP:
-            # Release any dragged item
-            if dragging_item:
-                if isinstance(dragging_item, Snail):
-                    # Check if snail is now in tank
-                    if TANK_RECT.collidepoint(dragging_item.x + dragging_item.width//2, 
-                                             dragging_item.y + dragging_item.height//2):
-                        dragging_item.in_garden = False
-                    else:
-                        dragging_item.in_garden = True
-                        
-                elif isinstance(dragging_item, Lettuce):
-                    # Check if lettuce is now in tank
-                    if TANK_RECT.collidepoint(dragging_item.x + dragging_item.width//2, 
-                                             dragging_item.y + dragging_item.height//2):
-                        dragging_item.in_garden = False
-                    else:
-                        dragging_item.in_garden = True
-                
-                elif isinstance(dragging_item, StoreItem):
-                    # Check if store item was dragged out of store
-                    if dragging_item.in_store and not STORE_RECT.collidepoint(dragging_item.x, dragging_item.y):
-                        # Deduct money
-                        money -= dragging_item.price
-                        dragging_item.in_store = False
-                        dragging_item.active = True
-                        
-                        # Apply special effects
-                        if dragging_item.name == "shoes":
-                            # Apply shoes to all snails
-                            for snail in snails:
-                                snail.speed *= 0.6  # Reduce speed to 60%
-                                snail.has_shoes = True  # Mark that this snail has shoes
-                        
-                        # Create a new item in the store with slight position offset to avoid stacking
-                        x_pos = 50 if dragging_item.name == "sprinkler" else (150 if dragging_item.name == "gnome" else 250)
-                        new_item = StoreItem(dragging_item.name, 
-                                         x_pos, 
-                                         20, 
-                                         dragging_item.price,
-                                         dragging_item.duration)
-                        store_items.append(new_item)
-                
-                dragging_item.dragging = False
-                dragging_item = None
-                
-        elif event.type == pygame.MOUSEMOTION:
-            mouse_x, mouse_y = event.pos
-            
-            # Move the item being dragged
-            if dragging_item:
-                dragging_item.x = mouse_x - dragging_item.width // 2
-                dragging_item.y = mouse_y - dragging_item.height // 2
-    
-    # Check if an object is going out of bounds and adjust
-    def keep_in_bounds(item):
-        # Keep objects within the screen boundaries
-        if item.x < 0:
-            item.x = 0
-        elif item.x > SCREEN_WIDTH - item.width:
-            item.x = SCREEN_WIDTH - item.width
-            
-        if item.y < STORE_RECT.height:  # Keep below store area
+# Function to keep objects within game boundaries
+def keep_in_bounds(item):
+    # Keep objects within the screen boundaries
+    if item.x < 0:
+        item.x = 0
+    elif item.x > SCREEN_WIDTH - item.width:
+        item.x = SCREEN_WIDTH - item.width
+        
+    # Keep below store area but not in tank if in garden
+    if item.in_garden if hasattr(item, 'in_garden') else not item.in_store:
+        if item.y < STORE_RECT.height:
             item.y = STORE_RECT.height
         elif item.y > SCREEN_HEIGHT - item.height:
             item.y = SCREEN_HEIGHT - item.height
             
-        # Force store items to stay in store if they're marked as in_store
-        if isinstance(item, StoreItem) and item.in_store:
-            if item.y > STORE_RECT.height - 10:
-                item.y = 20  # Reset to store height
-            
-    # Game logic
-    
-    # Spawn new snails and lettuce over time
-    spawn_timer += 0.1
-    if spawn_timer > 10:
-        # Maybe spawn a new snail in the garden (avoiding the tank area)
-        if random.random() < 0.3 and len(snails) < 10:
-            valid_spawn = False
-            while not valid_spawn:
-                x = random.randint(10, SCREEN_WIDTH - 60)
-                y = random.randint(10, SCREEN_HEIGHT - 50)
-                # Make sure it's not in the tank
-                if not TANK_RECT.collidepoint(x, y):
-                    valid_spawn = True
-            snails.append(Snail(x, y))
-            
-        # Maybe spawn new lettuce in the garden (avoiding the tank area)
-        if random.random() < 0.5 and len(lettuces) < 8:
-            valid_spawn = False
-            while not valid_spawn:
-                x = random.randint(10, SCREEN_WIDTH - 60)
-                y = random.randint(10, SCREEN_HEIGHT - 50)
-                # Make sure it's not in the tank
-                if not TANK_RECT.collidepoint(x, y):
-                    valid_spawn = True
-            lettuces.append(Lettuce(x, y))
-            
-        spawn_timer = 0
-    
-    # Check for lettuce that's been in the garden for 10 seconds (earn money)
-    current_time = time.time()
-    for lettuce in lettuces[:]:  # Use copy to safely remove items
-        if (lettuce.in_garden and not lettuce.bad and not lettuce.points_given and 
-            current_time - lettuce.spawn_time > 10):
-            # Award random amount between 10-25 cents
-            points_earned = random.randint(10, 25)
-            money += points_earned
-            # Remove the lettuce after giving points
-            lettuces.remove(lettuce)
-    
-    # Check for snails eating lettuce
-    for snail in snails:
-        for lettuce in lettuces[:]:  # Create a copy to safely remove items
-            if snail.rect.colliderect(lettuce.rect):
-                if lettuce.in_garden and snail.in_garden:
-                    # In garden, one bite ruins the lettuce
-                    lettuce.bad = True
-                elif not lettuce.in_garden and not snail.in_garden:
-                    # In tank, lettuce can take 5 bites
-                    lettuce.bites += 0.05
-                    # Reset snail hunger when eating
-                    snail.hunger = 0
-                    snail.escape_timer = 0
-                    if lettuce.bites >= 5:
-                        lettuces.remove(lettuce)
-    
-    # Update all game objects
-    for snail in snails:
-        snail.update(lettuces)
-        keep_in_bounds(snail)  # Keep snails on screen
-    
-    for lettuce in lettuces[:]:  # Create a copy to safely remove items
-        lettuce.update()
-        keep_in_bounds(lettuce)  # Keep lettuce on screen
-        # Remove bad lettuce from garden after a while
-        if lettuce.bad and lettuce.in_garden:
-            lettuce.bites += 0.01
-            if lettuce.bites > 3:
-                lettuces.remove(lettuce)
-    
-    # Update store items
-    for item in store_items[:]:  # Use copy to safely remove items
-        item.update()
-        
-        # Remove temporary items that have expired but aren't in store
-        if not item.active and not item.in_store and item.duration is not None:
-            store_items.remove(item)
-    
-    # Drawing
-    # Fill the background
-    screen.fill(WHITE)
-    
-    # Draw the garden area (now the entire screen except tank)
-    pygame.draw.rect(screen, GREEN, GARDEN_RECT)
-    
-    # Draw the tank area (lower right corner)
-    pygame.draw.rect(screen, BLUE, TANK_RECT)
-    
-    # Draw the store area at the top
-    pygame.draw.rect(screen, LIGHT_GRAY, STORE_RECT)
-    pygame.draw.line(screen, BLACK, (0, STORE_RECT.height), (SCREEN_WIDTH, STORE_RECT.height), 3)
-    
-    # Draw a border around the tank
-    pygame.draw.rect(screen, BLACK, TANK_RECT, 3)
-    
-    # Draw text
-    font = pygame.font.SysFont(None, 36)
-    garden_text = font.render("Garden", True, BLACK)
-    tank_text = font.render("Snail Tank", True, BLACK)
-    money_text = font.render(f"Money: ${money/100:.2f}", True, BLACK)
-    store_text = font.render("Store", True, BLACK)
-    
-    screen.blit(garden_text, (20, 110))
-    screen.blit(tank_text, (TANK_RECT.x + 10, TANK_RECT.y + 10))
-    screen.blit(money_text, (SCREEN_WIDTH - 200, 110))
-    screen.blit(store_text, (20, 10))
-    
-    # Draw store items
-    for item in store_items:
-        item.draw()
-    
-    # Draw game objects
-    for lettuce in lettuces:
-        lettuce.draw()
-        
-    for snail in snails:
-        snail.draw()
-        
-    # Update the display
-    pygame.display.flip()
-    
-    # Cap the frame rate
-    clock.tick(60)
-
-# Quit pygame
-pygame.quit()
-sys.exit()
+    # Force store items to stay in store if they're marked as in_store
+    if isinstance(item, StoreItem) and item.in_store:
+        if item.y < 10:
+            item.y = 20
+        elif item.y > STORE_RECT.height - 20:
+            item.y = 20
