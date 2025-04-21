@@ -2,6 +2,7 @@ import pygame
 import random
 import sys
 import time
+import math  # Added for distance calculations
 from settings import *
 from game_objects import StoreItem, Snail, Lettuce, keep_in_bounds
 
@@ -19,7 +20,7 @@ store_items = []
 mouse_x, mouse_y = 0, 0
 dragging_item = None
 spawn_timer = 0
-money = 500  # Starting money (raised to allow testing store items)
+money = 0  # Starting with no money - player needs to earn it
 
 # Create initial store items
 store_items.append(StoreItem("sprinkler", 50, 20, 100, duration=30))  # $1.00, lasts 30 seconds
@@ -75,45 +76,65 @@ while running:
         elif event.type == pygame.MOUSEBUTTONUP:
             # Release any dragged item
             if dragging_item:
+                # Get current mouse position for checking
+                mouse_x, mouse_y = event.pos
+                
                 if isinstance(dragging_item, Snail):
                     # Check if snail is now in tank
-                    if TANK_RECT.collidepoint(dragging_item.x + dragging_item.width//2, 
-                                             dragging_item.y + dragging_item.height//2):
+                    if TANK_RECT.collidepoint(mouse_x, mouse_y):
                         dragging_item.in_garden = False
                     else:
                         dragging_item.in_garden = True
+                        # Make sure snail is below store area
+                        if dragging_item.y < STORE_RECT.height:
+                            dragging_item.y = STORE_RECT.height
                         
                 elif isinstance(dragging_item, Lettuce):
                     # Check if lettuce is now in tank
-                    if TANK_RECT.collidepoint(dragging_item.x + dragging_item.width//2, 
-                                             dragging_item.y + dragging_item.height//2):
+                    if TANK_RECT.collidepoint(mouse_x, mouse_y):
                         dragging_item.in_garden = False
                     else:
                         dragging_item.in_garden = True
+                        # Make sure lettuce is below store area
+                        if dragging_item.y < STORE_RECT.height:
+                            dragging_item.y = STORE_RECT.height
                 
                 elif isinstance(dragging_item, StoreItem):
-                    # Check if store item was dragged out of store
-                    if dragging_item.in_store and not STORE_RECT.collidepoint(dragging_item.x, dragging_item.y):
-                        # Deduct money
-                        money -= dragging_item.price
-                        dragging_item.in_store = False
-                        dragging_item.active = True
-                        
-                        # Apply special effects
-                        if dragging_item.name == "shoes":
-                            # Apply shoes to all snails
-                            for snail in snails:
-                                snail.speed = snail.base_speed * 0.6  # Reduce speed to 60%
-                                snail.has_shoes = True  # Mark that this snail has shoes
-                        
-                        # Create a new item in the store with slight position offset to avoid stacking
-                        x_pos = 50 if dragging_item.name == "sprinkler" else (150 if dragging_item.name == "gnome" else 250)
-                        new_item = StoreItem(dragging_item.name, 
-                                         x_pos, 
-                                         20, 
-                                         dragging_item.price,
-                                         dragging_item.duration)
-                        store_items.append(new_item)
+                    # Check if store item was dragged out of store - use mouse position
+                    if dragging_item.in_store and mouse_y > STORE_RECT.height:
+                        # Check if enough money
+                        if money >= dragging_item.price:
+                            # Deduct money
+                            money -= dragging_item.price
+                            dragging_item.in_store = False
+                            dragging_item.active = True
+                            
+                            # Apply special effects
+                            if dragging_item.name == "shoes":
+                                # Apply shoes to all snails
+                                for snail in snails:
+                                    snail.speed = snail.base_speed * 0.6  # Reduce speed to 60%
+                                    snail.has_shoes = True  # Mark that this snail has shoes
+                            
+                            # Create a new item in the store with slight position offset to avoid stacking
+                            x_pos = 50 if dragging_item.name == "sprinkler" else (150 if dragging_item.name == "gnome" else 250)
+                            new_item = StoreItem(dragging_item.name, 
+                                             x_pos, 
+                                             20, 
+                                             dragging_item.price,
+                                             dragging_item.duration)
+                            store_items.append(new_item)
+                        else:
+                            # Not enough money, return item to store
+                            x_pos = 50 if dragging_item.name == "sprinkler" else (150 if dragging_item.name == "gnome" else 250)
+                            dragging_item.x = x_pos
+                            dragging_item.y = 20
+                    else:
+                        # Item was dragged but not placed correctly, return to store
+                        if dragging_item.in_store:
+                            x_pos = 50 if dragging_item.name == "sprinkler" else (150 if dragging_item.name == "gnome" else 250)
+                            dragging_item.x = x_pos
+                            dragging_item.y = 20
                 
                 dragging_item.dragging = False
                 dragging_item = None
@@ -174,14 +195,23 @@ while running:
             # Award random amount between 10-25 cents
             points_earned = random.randint(10, 25)
             money += points_earned
-            lettuce.points_given = True
-            # Mark for removal
-            lettuce.bad = True
+            # Remove the lettuce directly - no need to turn brown
+            lettuces.remove(lettuce)
     
-    # Check for snails eating lettuce
+    # Check for snails eating lettuce - but now with a distance check
     for snail in snails:
         for lettuce in lettuces[:]:  # Create a copy to safely remove items
-            if snail.rect.colliderect(lettuce.rect):
+            # Calculate actual distance between snail and lettuce (center to center)
+            snail_center_x = snail.x + snail.width // 2
+            snail_center_y = snail.y + snail.height // 2
+            lettuce_center_x = lettuce.x + lettuce.width // 2
+            lettuce_center_y = lettuce.y + lettuce.height // 2
+            
+            distance = math.sqrt((snail_center_x - lettuce_center_x)**2 + 
+                                (snail_center_y - lettuce_center_y)**2)
+            
+            # Only eat if very close (within 20 pixels of centers)
+            if distance < 20:
                 if lettuce.in_garden and snail.in_garden:
                     # In garden, one bite ruins the lettuce
                     lettuce.bad = True

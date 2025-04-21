@@ -106,8 +106,8 @@ class Snail:
         self.hunger = 0
         self.escape_timer = 0
         
-        # Give each snail a random base speed between 0.15 and 0.45
-        self.base_speed = 0.3 * random.uniform(0.5, 1.5)
+        # Give each snail a random base speed between 0.3 and 0.9 (doubled from before)
+        self.base_speed = 0.6 * random.uniform(0.5, 1.5)
         self.speed = self.base_speed
         
         self.target_x = x
@@ -195,18 +195,30 @@ class Snail:
             # Increment random movement timer
             self.random_move_timer += 0.1
             
-            # Decide whether to continue in last direction with VERY high probability (90%)
+            # Decide whether to continue in last direction with VERY high probability (80%)
             if self.last_dx != 0 or self.last_dy != 0:
-                if random.random() < 0.9:  # 90% chance to continue in same direction (increased from 80%)
+                if random.random() < 0.8:  # 80% chance to continue in same direction
                     self.x += self.last_dx
                     self.y += self.last_dy
                     return  # Skip the rest of movement logic
             
-            # MUCH more exaggerated random walk - higher chance of random movement
-            if random.random() < 0.03 or self.random_move_timer > random.uniform(2, 6):
-                # Set a random target with wider range
+            # Find closest lettuce more often, but with some randomness
+            if random.random() < 0.8:  # 80% chance to go toward lettuce (increased from 70%)
+                closest_lettuce = self.find_closest_lettuce(lettuces)
+                
+                if closest_lettuce:
+                    # Set target to the closest lettuce
+                    self.target_x = closest_lettuce.x
+                    self.target_y = closest_lettuce.y
+                    
+                    # Add some randomness to the target position
+                    self.target_x += random.uniform(-30, 30)
+                    self.target_y += random.uniform(-30, 30)
+            # Random walk less often
+            elif random.random() < 0.1 or self.random_move_timer > random.uniform(5, 10):
+                # Set a random target with smaller range (reduced from 200)
                 if self.in_garden:
-                    max_range = 200  # Much larger random movement range
+                    max_range = 100  # Smaller random movement range
                     valid_target = False
                     while not valid_target:
                         rand_x = self.x + random.uniform(-max_range, max_range)
@@ -224,15 +236,6 @@ class Snail:
                 self.target_x = rand_x
                 self.target_y = rand_y
                 self.random_move_timer = 0
-            else:
-                # Only sometimes go toward lettuce (less often than before)
-                if random.random() < 0.7:  # 70% chance to target lettuce
-                    closest_lettuce = self.find_closest_lettuce(lettuces)
-                    
-                    if closest_lettuce:
-                        # Set target to the closest lettuce
-                        self.target_x = closest_lettuce.x
-                        self.target_y = closest_lettuce.y
             
             # Calculate direction to target
             dx = self.target_x - self.x
