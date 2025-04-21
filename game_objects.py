@@ -19,6 +19,10 @@ class StoreItem:
         self.duration = duration  # None means permanent
         self.timer = 0
         self.effect_radius = 100  # For items that affect an area
+        # For electric fence
+        self.fence_start = None
+        self.fence_end = None
+        self.fence_active = False
         
     def draw(self, screen):
         # Draw different items based on name
@@ -67,6 +71,50 @@ class StoreItem:
             # Right boot
             pygame.draw.rect(screen, DARK_BROWN, (self.x + 35, boot_y, 15, 25))
             pygame.draw.rect(screen, DARK_BROWN, (self.x + 35, boot_y + 15, 20, 10))
+        
+        elif self.name == "fence":
+            # Draw an electric fence icon
+            pygame.draw.rect(screen, LIGHT_GRAY, (self.x, self.y, self.width, self.height))
+            # Draw a lightning bolt icon
+            pygame.draw.polygon(screen, YELLOW, [
+                (self.x + 30, self.y + 10),  # Top point
+                (self.x + 15, self.y + 30),  # Middle left
+                (self.x + 25, self.y + 30),  # Middle center
+                (self.x + 10, self.y + 50),  # Bottom point
+                (self.x + 25, self.y + 30),  # Middle center again
+                (self.x + 35, self.y + 30),  # Middle right
+            ])
+            
+            # Draw the actual fence if placed
+            if self.fence_active and self.fence_start and self.fence_end:
+                # Draw the fence line
+                pygame.draw.line(screen, YELLOW, self.fence_start, self.fence_end, 5)
+                
+                # Draw little electric zaps along the fence
+                fence_length = math.sqrt((self.fence_end[0] - self.fence_start[0])**2 + 
+                                        (self.fence_end[1] - self.fence_start[1])**2)
+                num_zaps = int(fence_length // 20)  # One zap every 20 pixels
+                
+                if num_zaps > 0:
+                    dx = (self.fence_end[0] - self.fence_start[0]) / num_zaps
+                    dy = (self.fence_end[1] - self.fence_start[1]) / num_zaps
+                    
+                    for i in range(num_zaps):
+                        zap_x = self.fence_start[0] + dx * i
+                        zap_y = self.fence_start[1] + dy * i
+                        
+                        # Draw a little lightning zap coming off the fence
+                        if i % 2 == 0:  # Only on every other segment
+                            # Get perpendicular direction
+                            perp_dx = -dy / fence_length * 10
+                            perp_dy = dx / fence_length * 10
+                            
+                            pygame.draw.line(screen, (255, 255, 0), 
+                                           (zap_x, zap_y),
+                                           (zap_x + perp_dx, zap_y + perp_dy), 2)
+                            pygame.draw.line(screen, (255, 255, 0), 
+                                           (zap_x + perp_dx, zap_y + perp_dy),
+                                           (zap_x + perp_dx*0.5, zap_y + perp_dy*0.5 + 5), 2)
             
         # Draw price tag if in store
         if self.in_store:
@@ -122,9 +170,9 @@ class Snail:
     def draw(self, screen):
         # Draw the snail - simplified but still looking good
         
-        # Draw the shell
-        shell_color = (180, 140, 100)
-        shell_pattern = (120, 80, 60)
+        # Draw the shell - changed to RED
+        shell_color = (220, 60, 60)  # Bright red shell
+        shell_pattern = (180, 30, 30)  # Darker red pattern
         pygame.draw.ellipse(screen, shell_color, (self.x, self.y, self.width, self.height))
         
         # Shell pattern - just two arcs, no random elements
@@ -135,26 +183,27 @@ class Snail:
                       (self.x + 10, self.y + 10, self.width - 20, self.height - 20), 
                       0, 3.14, 3)
         
-        # Draw the snail body (fixed position relative to shell)
+        # Draw the snail body (fixed position relative to shell) - changed to PINK
+        pink_color = (255, 150, 200)  # Pink body color
         body_length = 20
-        pygame.draw.ellipse(screen, BROWN, (self.x - body_length, self.y + self.height - 15, body_length + 10, 15))
+        pygame.draw.ellipse(screen, pink_color, (self.x - body_length, self.y + self.height - 15, body_length + 10, 15))
         
-        # Draw the snail head (fixed position)
-        pygame.draw.ellipse(screen, BROWN, (self.x - body_length - 10, self.y + self.height - 18, 15, 10))
+        # Draw the snail head (fixed position) - also PINK
+        pygame.draw.ellipse(screen, pink_color, (self.x - body_length - 10, self.y + self.height - 18, 15, 10))
         
-        # Draw the eye stalks (fixed position)
+        # Draw the eye stalks (fixed position) - also PINK
         stalk1_x = self.x - body_length - 5
         stalk1_y = self.y + self.height - 15
         stalk2_x = self.x - body_length
         stalk2_y = self.y + self.height - 15
         
-        # Draw eye stalks
-        pygame.draw.line(screen, BROWN, (stalk1_x, stalk1_y), 
+        # Draw eye stalks - also PINK
+        pygame.draw.line(screen, pink_color, (stalk1_x, stalk1_y), 
                          (stalk1_x - 5, stalk1_y - 15), 2)
-        pygame.draw.line(screen, BROWN, (stalk2_x, stalk2_y), 
+        pygame.draw.line(screen, pink_color, (stalk2_x, stalk2_y), 
                          (stalk2_x - 0, stalk2_y - 15), 2)
         
-        # Draw the eyes
+        # Draw the eyes - keeping BLACK
         pygame.draw.circle(screen, BLACK, (stalk1_x - 5, stalk1_y - 15), 2)
         pygame.draw.circle(screen, BLACK, (stalk2_x - 0, stalk2_y - 15), 2)
         
@@ -186,6 +235,36 @@ class Snail:
                     closest_lettuce = lettuce
         
         return closest_lettuce
+
+    def check_fence_collision(self, store_items):
+        # Check if snail is crossing an electric fence
+        for item in store_items:
+            if item.name == "fence" and item.fence_active and item.fence_start and item.fence_end:
+                # Calculate the distance from snail to the fence line
+                # using the formula for distance from point to line segment
+                x1, y1 = item.fence_start
+                x2, y2 = item.fence_end
+                x3, y3 = self.x + self.width//2, self.y + self.height//2
+                
+                # Calculate the length of the fence line
+                line_length = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+                
+                if line_length == 0:  # Avoid division by zero if fence points are the same
+                    return False
+                
+                # Calculate the distance from point to line
+                numerator = abs((y2-y1)*x3 - (x2-x1)*y3 + x2*y1 - y2*x1)
+                distance = numerator / line_length
+                
+                # Check if point is actually within the line segment bounds
+                # Project point onto line
+                t = ((x3-x1)*(x2-x1) + (y3-y1)*(y2-y1)) / (line_length * line_length)
+                
+                # If projection is on the line segment and distance is small, consider it a collision
+                if 0 <= t <= 1 and distance < 15:
+                    return True
+                    
+        return False
         
     def update(self, lettuces, store_items):
         self.rect = pygame.Rect(self.x, self.y, self.width, self.height)
@@ -198,8 +277,30 @@ class Snail:
             # Decide whether to continue in last direction with VERY high probability (80%)
             if self.last_dx != 0 or self.last_dy != 0:
                 if random.random() < 0.8:  # 80% chance to continue in same direction
-                    self.x += self.last_dx
-                    self.y += self.last_dy
+                    # First check if this movement would cross a fence
+                    future_x = self.x + self.last_dx
+                    future_y = self.y + self.last_dy
+                    
+                    # Check if future position would be out of bounds
+                    if future_x < 0 or future_x > SCREEN_WIDTH - self.width or \
+                       future_y < STORE_RECT.height or future_y > SCREEN_HEIGHT - self.height:
+                        # Bounce off the edge with a new random direction
+                        random_angle = random.uniform(0, 2 * math.pi)
+                        self.last_dx = math.cos(random_angle) * self.speed
+                        self.last_dy = math.sin(random_angle) * self.speed
+                        return
+                        
+                    self.x = future_x
+                    self.y = future_y
+                    
+                    # Check if we just crossed a fence
+                    if self.check_fence_collision(store_items):
+                        # Bounce back and change direction
+                        self.x -= self.last_dx * 2
+                        self.y -= self.last_dy * 2
+                        self.last_dx = -self.last_dx
+                        self.last_dy = -self.last_dy
+                    
                     return  # Skip the rest of movement logic
             
             # Find closest lettuce more often, but with some randomness
@@ -297,12 +398,31 @@ class Snail:
             move_dx = ((dx / distance) * current_speed) + jitter_x
             move_dy = ((dy / distance) * current_speed) + jitter_y
             
-            self.x += move_dx
-            self.y += move_dy
+            # Check if this movement would cross a fence
+            future_x = self.x + move_dx
+            future_y = self.y + move_dy
             
-            # Store the last movement for direction persistence
-            self.last_dx = move_dx
-            self.last_dy = move_dy
+            # Save original position to restore if fence crossed
+            orig_x, orig_y = self.x, self.y
+            
+            # Move the snail
+            self.x = future_x
+            self.y = future_y
+            
+            # Check if we just crossed a fence
+            if self.check_fence_collision(store_items):
+                # Bounce back and generate new random direction
+                self.x = orig_x
+                self.y = orig_y
+                
+                # Choose a random new direction to go instead
+                random_angle = random.uniform(0, 2 * math.pi)
+                self.last_dx = math.cos(random_angle) * current_speed
+                self.last_dy = math.sin(random_angle) * current_speed
+            else:
+                # Store the last movement for direction persistence
+                self.last_dx = move_dx
+                self.last_dy = move_dy
             
         # If in tank, increase hunger and maybe try to escape
         if not self.in_garden:
@@ -330,13 +450,37 @@ class Lettuce:
         self.spawn_time = time.time()  # Track when the lettuce was created
         self.points_given = False  # Track if we've given points for this lettuce
         
+        # Add different lettuce types with different colors and bite resistance
+        self.lettuce_type = random.choice(["green", "yellow", "red", "purple"])
+        
+        # Set max bites based on type
+        if self.lettuce_type == "green":
+            self.max_bites = 5  # Regular green lettuce (unchanged)
+        elif self.lettuce_type == "yellow":
+            self.max_bites = 15  # Yellow can take 10 more bites
+        elif self.lettuce_type == "red":
+            self.max_bites = 25  # Red can take 20 more bites
+        elif self.lettuce_type == "purple":
+            self.max_bites = 35  # Purple can take 30 more bites
+        
     def draw(self, screen):
+        # Set color based on type
         if self.bad:
             color = (150, 150, 0)  # Yellowish for bad lettuce
             edge_color = (130, 130, 0)
         else:
-            color = LIME_GREEN  # Brighter green for good lettuce
-            edge_color = (30, 180, 30)  # Darker green for edges
+            if self.lettuce_type == "green":
+                color = LIME_GREEN
+                edge_color = (30, 180, 30)
+            elif self.lettuce_type == "yellow":
+                color = (220, 220, 50)  # Bright yellow
+                edge_color = (180, 180, 30)
+            elif self.lettuce_type == "red":
+                color = (220, 60, 60)  # Bright red
+                edge_color = (180, 30, 30)
+            elif self.lettuce_type == "purple":
+                color = (180, 60, 220)  # Purple
+                edge_color = (140, 30, 180)
             
         # Main leaf shape
         leaf_width = self.width
@@ -364,14 +508,21 @@ class Lettuce:
         
         # Show bite marks if in tank and being eaten
         if not self.in_garden and self.bites > 0:
-            num_bites = min(int(self.bites + 1), 5)
-            bite_positions = [(10, 10), (30, 15), (15, 25), (35, 30), (25, 5)]
+            num_bites = min(int(self.bites + 1), self.max_bites)
+            
+            # More bite positions for more durable lettuce
+            bite_positions = []
+            for _ in range(min(40, self.max_bites)):  # Generate up to 40 positions
+                bite_positions.append((
+                    random.randint(5, self.width-5), 
+                    random.randint(5, self.height-5)
+                ))
             
             for i in range(num_bites):
                 if i < len(bite_positions):
                     bite_x = self.x + bite_positions[i][0]
                     bite_y = self.y + bite_positions[i][1]
-                    bite_size = 6
+                    bite_size = 4
                     pygame.draw.circle(screen, WHITE, (bite_x, bite_y), bite_size)
         
     def update(self):

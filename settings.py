@@ -13,6 +13,10 @@ BLUE = (100, 100, 255)
 BLACK = (0, 0, 0)
 LIGHT_GRAY = (220, 220, 220)
 DARK_BROWN = (90, 40, 10)  # Darker brown for snail boots
+YELLOW = (220, 220, 50)    # Yellow for yellow lettuce
+RED = (220, 60, 60)        # Red for red lettuce
+PURPLE = (180, 60, 220)    # Purple for purple lettuce
+ELECTRIC_YELLOW = (255, 255, 0)  # Bright yellow for electric fence
 
 # Game areas
 GARDEN_RECT = pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
